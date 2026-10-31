@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Routing Simulator - Network Protocol Analysis</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="titles">
+                <h1>Packet Routing Simulator</h1>
+                <p>Interactive Network Topology, Link-State & Distance Vector Engine</p>
+            </div>
+            <div class="header-controls">
+                <div class="speed-control">
+                    <label for="simSpeed">Speed:</label>
+                    <select id="simSpeed">
+                        <option value="1">1.0x (Normal)</option>
+                        <option value="2">2.0x (Fast)</option>
+                        <option value="0.5">0.5x (Slow)</option>
+                        <option value="0">Instant</option>
+                    </select>
+                </div>
+                <div class="status-badge" id="serverStatus">
+                    Checking backend...
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Panel: Topology & Attack Controls -->
+        <aside class="left-panel card">
+            <h3>Topology Actions</h3>
+            <div class="actions">
+                <button id="btnLoadDemo" class="secondary">Load Standard Grid</button>
+                <button id="btnLoadEcmp" class="secondary">Load Multi-Path Grid (ECMP)</button>
+                <button id="btnClear" class="danger">Clear All</button>
+                <button id="btnAddNode" class="secondary">+ Add Router Node</button>
+                <button id="btnAddEdge" class="secondary">+ Add Link Edge</button>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <h3>Security & Threat Testing</h3>
+            <div class="control-group">
+                <label class="checkbox-label" for="chkSimulateRogue">
+                    <input type="checkbox" id="chkSimulateRogue">
+                    Simulate Rogue Router (Route Poisoning)
+                </label>
+            </div>
+            <div class="control-group" id="rogueSelectContainer" style="display: none;">
+                <label for="rogueNodeSelect">Compromised Router:</label>
+                <select id="rogueNodeSelect"></select>
+                <label class="checkbox-label" for="chkRpkiDefense" style="margin-top: 6px;">
+                    <input type="checkbox" id="chkRpkiDefense">
+                    RPKI Origin Validation & Quarantine
+                </label>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="instructions">
+                <p><strong>Interaction Guide:</strong></p>
+                <p>- Drag nodes to reposition routers on the canvas.</p>
+                <p>- Click any cable edge to simulate physical link failure.</p>
+                <p>- Click any router in Idle mode to inspect its Routing Table.</p>
+            </div>
+        </aside>
+
+        <!-- Center: Visualization Canvas -->
+        <section class="canvas-container card">
+            <div class="canvas-toolbar">
+                <span class="toolbar-title">Network Canvas</span>
+                <span class="legend-items">
+                    <span class="legend-item"><span class="legend-swatch src"></span> Source</span>
+                    <span class="legend-item"><span class="legend-swatch dst"></span> Destination</span>
+                    <span class="legend-item"><span class="legend-swatch rogue"></span> Rogue</span>
+                    <span class="legend-item"><span class="legend-swatch fail"></span> Failed Link</span>
+                </span>
+            </div>
+            <svg id="visualization" width="100%" height="600"></svg>
+        </section>
+
+        <!-- Right Panel: Simulation Controls -->
+        <aside class="right-panel card">
+            <h3>Simulation Parameters</h3>
+            
+            <div class="control-group">
+                <label for="algorithm">Routing Algorithm</label>
+                <select id="algorithm">
+                    <option value="dijkstra">Dijkstra (Link-State / OSPF)</option>
+                    <option value="distance_vector">Distance Vector (Bellman-Ford / RIP)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="sourceNode">Source Router</label>
+                <select id="sourceNode"></select>
+            </div>
+            
+            <div class="control-group">
+                <label for="destNode">Destination Router</label>
+                <select id="destNode"></select>
+            </div>
+
+            <div class="control-group">
+                <label for="trafficMode">Traffic Transmission Mode</label>
+                <select id="trafficMode">
+                    <option value="single">Single Packet Stream</option>
+                    <option value="flow_burst">Traffic Flow Burst (ECMP Load Balanced)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="qosClass">Quality of Service (QoS) Class</label>
+                <select id="qosClass">
+                    <option value="best_effort">Best-Effort (Standard Data - DSCP 0)</option>
+                    <option value="expedited_forwarding">Expedited Forwarding (VoIP - DSCP 46)</option>
+                </select>
+            </div>
+
+            <div class="control-group toggles">
+                <label class="checkbox-label" for="chkCongestion">
+                    <input type="checkbox" id="chkCongestion"> Dynamic Congestion
+                </label>
+                <label class="checkbox-label" for="chkSplitHorizon">
+                    <input type="checkbox" id="chkSplitHorizon" checked> Split Horizon (DV)
+                </label>
+            </div>
+
+            <div class="actions">
+                <button id="btnSimulate" class="primary">Run Simulation</button>
+                <button id="btnCompare" class="secondary">Compare Protocols</button>
+                <button id="btnViewRoutingTable" class="secondary">Inspect Routing Table (FIB)</button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Bottom Panel: Metrics & Terminal -->
+    <section class="bottom-panel card">
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="stat-label">Delivery Status</span>
+                <span class="stat-value" id="resStatus">-</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Total Link Cost</span>
+                <span class="stat-value" id="resCost">-</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Total Hops</span>
+                <span class="stat-value" id="resHops">-</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Algorithmic Compute Time</span>
+                <span class="stat-value" id="resTime">-</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Security State</span>
+                <span class="stat-value" id="resSecurity">Verified Normal</span>
+            </div>
+        </div>
+        
+        <div class="trace-terminal">
+            <div class="terminal-header">
+                <span>Network Protocol Trace Terminal</span>
+                <div class="terminal-actions">
+                    <button id="btnClearLog" class="btn-terminal">Clear</button>
+                </div>
+            </div>
+            <div id="logContent"></div>
+        </div>
+    </section>
+
+    <!-- Comparison Modal -->
+    <div id="compareModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Routing Protocol Benchmark & Empirical Analysis</h3>
+                <button id="btnCloseCompare" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="compareModalBody">
+                <p>Running benchmark analysis...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routing Table (FIB) Modal -->
+    <div id="routingTableModal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="routingTableTitle">Forwarding Information Base (Routing Table)</h3>
+                <button id="btnCloseRoutingTable" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="routingTableBody">
+                <p>Loading routing table...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/graph-ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

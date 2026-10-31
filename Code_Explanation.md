@@ -1,100 +1,206 @@
 # In-Depth Technical Architecture & Code Explanation
 
-This document provides a highly detailed, line-by-line conceptual breakdown of the Packet Routing Simulator. It is designed to explain the exact mechanics, data structures, and computer science principles used to make the application function.
+This document provides a conceptual and architectural breakdown of the Packet Routing Simulator codebase, explaining data structures, algorithms, mathematical formulations, and execution flows across the backend and frontend.
 
 ---
 
-## 1. Deep Dive: C++ Concepts & Implementation
-The C++ backend is designed for high-performance computing. It uses Modern C++ (C++17) to process complex network graphs in microseconds.
+## 1. Backend Architecture (`server.js`)
 
-### A. The Adjacency List (Graph Representation)
-In computer science, networks are represented as graphs. Rather than creating a massive 2D matrix of every router, the code uses an **Adjacency List** for memory efficiency.
-*   **The Code:** `std::unordered_map<string, vector<pair<string, int>>> adj;`
-*   **Explanation:** 
-    *   `std::unordered_map`: This is a Hash Table. It allows O(1) instant lookup. The "Key" is the Router ID (a `string` like "R1").
-    *   The "Value" is a `std::vector` (a dynamic array) containing pairs. 
-    *   `std::pair<string, int>`: Represents the neighbor's ID and the weight of the cable connecting them.
-    *   *Result:* We can instantly ask, "Who is R1 connected to?" and get a lightweight list of neighbors.
+The backend is built as a zero-dependency HTTP server utilizing Node.js core modules (`http`, `fs`, `path`, and `perf_hooks`).
 
-### B. Min-Heap Priority Queue (Dijkstra's Engine)
-Dijkstra's algorithm requires us to always process the closest unvisited router first.
-*   **The Code:** `std::priority_queue<pair<int, string>, vector<pair<int, string>>, greater<pair<int, string>>> pq;`
-*   **Explanation:** 
-    *   A standard queue is "First In, First Out". A *Priority Queue* automatically sorts items so the "most important" is always at the front.
-    *   We use `std::greater` to reverse the default sorting, turning it into a **Min-Heap**. This ensures that the router with the *smallest* current distance (`int`) is always popped first, guaranteeing mathematical accuracy for the shortest path.
+### A. Adjacency List & Graph Structure
+In memory, the network graph is maintained as an array of node objects and edge objects:
+* Each Node: `{ id: "R1", name: "Router 1", x: 100, y: 120 }`
+* Each Edge: `{ id: "e1", source: "R1", target: "R2", weight: 4, active: true }`
 
-### C. Memory Management (Pass-by-Reference)
-*   **The Code:** `json Simulator::runSimulation(const json& request)`
-*   **Explanation:** When the web server receives a massive JSON payload (maybe containing 10,000 routers), passing it to the simulator normally would create a complete clone of the data in the RAM, slowing down the server.
-    *   The `&` symbol means **Pass-by-Reference**. We just pass the memory address of the JSON.
-    *   The `const` keyword ensures the Simulator is physically blocked from altering the original data. This guarantees memory safety while maximizing speed.
+Edges represent bidirectional physical cables. When an edge's `active` property is set to `false`, it is excluded from neighbor discovery, simulating a severed fiber cable or interface shutdown.
 
----
+### B. Dijkstra Link-State Implementation with ECMP
+The Dijkstra implementation solves the single-source shortest path problem and discovers all equal-cost shortest paths:
 
-## 2. Deep Dive: Node.js Backend (`server.js`)
-Because the user may not have a C++ compiler, a fallback backend was written in raw Node.js.
+```javascript
+function runDijkstra(src, target, nodes, edges) {
+    const dist = {};
+    const prev = {};
+    const prevAll = {};
+    const pq = [];
 
-### A. Raw HTTP Server (No Frameworks)
-Unlike typical web apps that use bulky frameworks like Express.js, this project uses Node's bare-metal `http` module.
-*   **CORS Management:** `res.setHeader('Access-Control-Allow-Origin', '*');` is manually injected. This tells the browser, "It is safe to accept data from this server," bypassing strict browser security policies that normally block cross-origin requests.
-*   **Data Streaming:** When the frontend sends a large network graph, it doesn't arrive all at once. It arrives in packets (chunks).
-    *   **The Code:** `req.on('data', chunk => body += chunk.toString());`
-    *   **Explanation:** The server listens for data streams, stitching the chunks of text together until `req.on('end')` fires, at which point it parses the full string into a JSON object.
+    nodes.forEach(n => {
+        dist[n.id] = Infinity;
+        prev[n.id] = null;
+        prevAll[n.id] = [];
+    });
+    dist[src] = 0;
+    pq.push({ id: src, dist: 0 });
 
----
+    while (pq.length > 0) {
+        pq.sort((a, b) => a.dist - b.dist);
+        const u = pq.shift().id;
 
-## 3. Deep Dive: Frontend Architecture (`web/js/`)
-
-### A. SVG DOM Manipulation (`graph-ui.js`)
-The visualization does not use an HTML `<canvas>`. It uses **SVG (Scalable Vector Graphics)**.
-*   **The Concept:** SVGs are mathematically defined shapes. Unlike a canvas (which is just pixels), every router and wire in the SVG is a real HTML element that the mouse can interact with.
-*   **Namespace (`createElementNS`):** Standard HTML tags (`<div>`, `<p>`) use the standard DOM. SVGs exist in a different XML namespace. To create a circle via JavaScript, the code *must* use `document.createElementNS("http://www.w3.org/2000/svg", "circle")`.
-*   **Dragging Math:** When you drag a node, the code uses `getBoundingClientRect()` to figure out where the SVG canvas exists relative to your monitor screen. It subtracts this offset from your mouse's `clientX` position to perfectly map your screen pixel to the internal SVG coordinate system.
-
-### B. The Animation Physics
-When a packet travels, it doesn't just teleport; it slides smoothly.
-*   **The Code:** `requestAnimationFrame(frame)`
-*   **Explanation:** Using `setTimeout` for animation causes screen tearing and stuttering. `requestAnimationFrame` tells the user's graphics card (GPU) and monitor to sync the animation exactly to the monitor's refresh rate (e.g., 60 frames per second).
-*   **Easing Functions:** To make the packet look natural, it doesn't move at a linear speed. The code uses a mathematical polynomial easing function (`2 * p * p`) so the packet gently accelerates out of the router and decelerates as it approaches the next one.
-
----
-
-## 4. The Client-Server Connection (The JSON Contract)
-How do the UI and the math engine actually talk to each other? They use a strict data contract called JSON.
-
-### Step 1: The Request (Frontend -> Backend)
-When you click "Run Simulation", `app.js` bundles the entire state of the UI into a text string and POSTs it to the server.
-```json
-{
-  "source": "R1",
-  "target": "R3",
-  "algorithm": "distance_vector",
-  "options": {
-    "congestionAware": true,
-    "splitHorizon": true
-  },
-  "nodes": [ {"id":"R1", "x":100, "y":100}, {"id":"R3", "x":500, "y":100} ],
-  "edges": [ {"id":"e1", "source":"R1", "target":"R3", "weight":4, "active":true} ]
+        const neighbors = edges.filter(e => e.active && (e.source === u || e.target === u));
+        neighbors.forEach(e => {
+            const v = (e.source === u) ? e.target : e.source;
+            const alt = dist[u] + e.weight;
+            if (alt < dist[v]) {
+                dist[v] = alt;
+                prev[v] = u;
+                prevAll[v] = [u];
+                pq.push({ id: v, dist: alt });
+            } else if (alt === dist[v] && alt < Infinity) {
+                if (!prevAll[v].includes(u)) {
+                    prevAll[v].push(u);
+                }
+            }
+        });
+    }
+    return { dist, prev, prevAll };
 }
 ```
 
-### Step 2: The Computation
-The backend server receives this text, parses it, executes the Bellman-Ford or Dijkstra algorithm, and creates a step-by-step trace of exactly what happened.
+* **Equal-Cost Multi-Path (ECMP) Backtracking:**
+  When `alt < dist[v]`, any previous parent candidates are discarded, and `prevAll[v]` is reset to `[u]`.
+  When `alt === dist[v]`, an alternative path of identical cost has been discovered, and `u` is added to `prevAll[v]`.
+  The companion function `getAllShortestPaths(src, target, prevAll)` performs recursive depth-first backtracking from the destination back to the origin, extracting all parallel shortest path sequences.
 
-### Step 3: The Response (Backend -> Frontend)
-The server responds with a strictly formatted answer.
-```json
-{
-  "success": true,
-  "algorithm": "distance_vector",
-  "totalCost": 4,
-  "hops": 1,
-  "computationTimeMs": 2,
-  "delivered": true,
-  "trace": [
-    { "node": "R1", "edge": "e1", "message": "Packet routed through R1 (cost to next: 4)" },
-    { "node": "R3", "edge": null, "message": "Packet successfully arrived at R3" }
-  ]
+### C. Distance Vector (Bellman-Ford) Engine
+```javascript
+function runDistanceVector(src, target, nodes, edges, options = {}) {
+    // Distance array initialization
+    for (let i = 0; i < nodes.length - 1; i++) {
+        let updated = false;
+        for (const e of activeEdges) {
+            const u = e.source, v = e.target, w = e.weight;
+            if (dist[u] !== Infinity && dist[u] + w < dist[v]) {
+                dist[v] = dist[u] + w;
+                prev[v] = u;
+                updated = true;
+            }
+            if (dist[v] !== Infinity && dist[v] + w < dist[u]) {
+                dist[u] = dist[v] + w;
+                prev[u] = v;
+                updated = true;
+            }
+        }
+        if (!updated) break;
+    }
+    return { dist, prev };
 }
 ```
-Upon receiving this, `app.js` reads `res.totalCost` to update the scoreboard, and hands the `trace` array to the `GraphUI.animatePacket()` function, which begins the visual rendering loop.
+* **Split Horizon Logic:** When enabled, reverse advertisements along the incoming next-hop link are suppressed to eliminate two-node count-to-infinity routing loops.
+
+### D. Scientific Microsecond Compute Time Benchmarking
+To circumvent timer granularity limits on single short computations, the backend executes a rigorous benchmark loop over 1,000 runs:
+
+```javascript
+const BENCHMARK_RUNS = 1000;
+const tBenchStart = performance.now();
+for (let i = 0; i < BENCHMARK_RUNS; i++) {
+    if (algoStr === 'distance_vector') {
+        runDistanceVector(src, target, activeNodes, simEdges, options);
+    } else {
+        runDijkstra(src, target, activeNodes, simEdges);
+    }
+}
+const totalBenchmarkElapsed = performance.now() - tBenchStart;
+const avgTimeMs = totalBenchmarkElapsed / BENCHMARK_RUNS;
+const avgTimeUs = avgTimeMs * 1000;
+```
+This produces mathematically reproducible microsecond execution measurements ($\mu$s) that reflect true CPU processing latency.
+
+### E. Cyber Threat Modeling: Rogue Router & RPKI Quarantine
+* **Without RPKI Defense:** When a rogue router is active, the simulator injects low-cost link overrides ($w = 1$), causing neighboring shortest path trees to converge into the rogue node. If a packet enters the rogue router, the transmission loop breaks with a blackhole drop alert.
+* **With RPKI Defense:** The origin validation filter detects the unauthorized advertisement, flags the anomaly, quarantines the rogue node from the active graph (`activeNodes = activeNodes.filter(...)`), and recalculates an authentic alternative route.
+
+### F. Forwarding Information Base (FIB) Generation
+The `/api/routing-table` endpoint invokes `computeRoutingTable(routerId, nodes, edges)`. It executes a single-pass link-state shortest path tree from the specified router to all other nodes in the network, returning a structured table of Destination, Next-Hop, Metric Cost, and Reachability Status.
+
+---
+
+## 2. Frontend Architecture (`public/js/`)
+
+### A. GraphUI Class (`graph-ui.js`)
+* **Namespace Handling:** Utilizes `document.createElementNS("http://www.w3.org/2000/svg", tag)` to manipulate SVG vector elements directly within the browser DOM.
+* **Physics & Easing:**
+  Packet motion is calculated using a cubic easing function:
+  $$E(p) = \begin{cases} 4p^3 & p < 0.5 \\ 1 - \frac{(-2p + 2)^3}{2} & p \ge 0.5 \end{cases}$$
+  This ensures smooth acceleration from router departure to arrival.
+* **Multi-Flow ECMP Rendering:**
+  In Flow Burst mode, multiple packets (`packet-flow-1`, `packet-flow-2`, etc.) are spawned asynchronously and animated along their respective paths with staggered time offsets.
+* **Speed Scaling:**
+  A speed multiplier dynamically adjusts per-hop durations ($T = \frac{450\text{ ms}}{\text{speed}}$), supporting $1.0\times$, $2.0\times$, $0.5\times$, and instant rendering.
+
+### B. Application State Management (`app.js`)
+* **Interactive Mode State:** Tracks whether the user is in `idle`, `add_node`, or `add_edge` mode.
+* **FIB Modal Integration:** Clicking any router in idle mode queries the backend via `API.fetchRoutingTable()` and renders a formatted table inside an accessible modal overlay.
+* **Benchmark Comparison Modal:** The `btnCompare` handler requests `/api/compare` and constructs an empirical evaluation matrix comparing Dijkstra and Distance Vector across 2,000 iterations.
+
+### C. Client API Module (`api.js`)
+Encapsulates all asynchronous `fetch()` requests with standard JSON headers and error propagation. Employs `AbortController` on background health checks to prevent dangling sockets.
+
+---
+
+## 3. Communication Protocol (REST API Contracts)
+
+### `POST /api/simulate`
+* **Request Payload:**
+  ```json
+  {
+    "source": "R1",
+    "target": "R6",
+    "algorithm": "dijkstra",
+    "options": {
+      "trafficMode": "flow_burst",
+      "qosClass": "expedited_forwarding",
+      "simulateRogue": true,
+      "rogueNodeId": "R2",
+      "rpkiEnabled": true,
+      "congestionAware": false,
+      "splitHorizon": true
+    },
+    "nodes": [...],
+    "edges": [...]
+  }
+  ```
+* **Response Payload:**
+  ```json
+  {
+    "success": true,
+    "algorithm": "dijkstra",
+    "totalCost": 7,
+    "hops": 3,
+    "computationTimeMs": 0.0038,
+    "computationTimeUs": 3.82,
+    "benchmarkRuns": 1000,
+    "delivered": true,
+    "trace": [...],
+    "ecmpPaths": [["R1","R2","R4","R6"], ["R1","R3","R5","R6"]],
+    "quarantinedNodes": ["R2"],
+    "qosApplied": "expedited_forwarding"
+  }
+  ```
+
+### `POST /api/routing-table`
+* **Request Payload:** `{ "routerId": "R1", "nodes": [...], "edges": [...] }`
+* **Response Payload:**
+  ```json
+  {
+    "success": true,
+    "routerId": "R1",
+    "table": [
+      { "destination": "R2", "nextHop": "R2", "metric": 3, "hops": 1, "status": "Converged" },
+      { "destination": "R6", "nextHop": "R3", "metric": 7, "hops": 3, "status": "Converged" }
+    ]
+  }
+  ```
+
+### `POST /api/compare`
+* **Request Payload:** `{ "source": "R1", "target": "R6", "nodes": [...], "edges": [...] }`
+* **Response Payload:**
+  ```json
+  {
+    "success": true,
+    "iterations": 2000,
+    "dijkstra": { "protocol": "Link-State (OSPF)", "avgTimeUs": 3.32, "complexity": "O((V + E) log V)" },
+    "distanceVector": { "protocol": "Distance Vector (RIP)", "avgTimeUs": 2.14, "complexity": "O(V * E)" }
+  }
+  ```

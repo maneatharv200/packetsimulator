@@ -1,0 +1,17 @@
+build/
+src/
+algorithms/
+include/
+server/
+third_party/
+.kilo/
+CMakeLists.txt
+*.md
+*.exe
+*.obj
+*.o
+*.a
+*.lib
+*.dll
+node_modules/
+.git

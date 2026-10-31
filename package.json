@@ -1,0 +1,21 @@
+{
+  "name": "packet-routing-simulator",
+  "version": "1.0.0",
+  "description": "Interactive Packet Routing Simulator with Dijkstra and Distance Vector algorithms",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.x"
+  },
+  "keywords": [
+    "packet-routing",
+    "dijkstra",
+    "distance-vector",
+    "simulation",
+    "networking"
+  ],
+  "license": "MIT"
+}

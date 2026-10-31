@@ -1,80 +1,122 @@
 # Comprehensive Project Report: Packet Routing Simulator
 
 ## 1. Abstract
-The **Packet Routing Simulator** is an interactive, web-based software application designed to visualize and benchmark how data packets travel across a network of routers. It provides a real-time, drag-and-drop environment where users can build custom network topologies, simulate physical link failures, and observe how different routing algorithms (Dijkstra's Link-State and Bellman-Ford's Distance Vector) adapt to these changes dynamically. 
-
-## 2. Project Need and Objectives
-### The Problem
-In modern computer networks, routing algorithms operate silently in the background. When a user requests a web page, the data packets traverse multiple routers, often recalculating paths on the fly due to broken cables or heavy traffic (congestion). For students and engineers, understanding these abstract mathematical processes is difficult without a visual aid.
-
-### The Objective
-This project was built to:
-1. **Visualize the Invisible:** Turn abstract routing mathematics into a tangible, visual animation where packets can be seen moving node-by-node.
-2. **Provide Interactive Learning:** Allow users to actively break connections and see how the network "heals" itself.
-3. **Compare Performance:** Provide an empirical benchmark tool to measure the computational latency of different routing algorithms on the exact same dataset.
+The **Packet Routing Simulator** is an interactive, web-based software application designed to visualize, evaluate, and benchmark how data packets traverse modern telecommunication networks. It provides an interactive canvas where network engineers, educators, and students can build custom topologies, simulate physical link cuts, evaluate cyber threat scenarios (route poisoning and blackhole attacks), test data center multi-path load balancing (ECMP), and observe how core algorithms (Dijkstra's Link-State and Bellman-Ford's Distance Vector) converge dynamically under varied traffic conditions.
 
 ---
 
-## 3. Innovative Features in Detail
-This simulator goes beyond static shortest-path calculators by implementing dynamic, real-world network phenomena:
+## 2. Project Need and Objectives
 
-*   **Custom Topology Builder:** Users are not restricted to a fixed map. Through the interactive SVG canvas, users can add custom routers (nodes) and define custom cables (edges) with specific latency weights.
-*   **Real-time Fault Tolerance Testing:** Users can click on any network cable to instantly "cut" it. The simulator instantly recalculates the backup route, demonstrating network resilience.
-*   **Congestion Awareness Engine:** By enabling this feature, the backend temporarily inflates the "weight" (latency) of random cables to simulate sudden heavy traffic. The algorithm must intelligently route the packet around this invisible traffic jam.
-*   **Split Horizon Loop Prevention:** Specifically for the Distance Vector algorithm, this feature enables "Route Poisoning" logic to prevent the famous *Count-to-Infinity* problem, where disconnected routers loop packets back and forth forever.
-*   **Microsecond Benchmarking:** A dedicated comparison engine forces the backend to calculate the shortest path 1,000 times in a loop, recording the execution time down to the millisecond to prove which algorithm is computationally heavier.
+### The Problem
+In modern computer networks, routing protocols operate transparently in background firmware. When end users transmit requests, packets traverse complex meshes of autonomous systems (AS) and routers, recalculating paths dynamically in response to physical cable damage, buffer exhaustion, or security incidents. For engineers and students, understanding these abstract mathematical processes is challenging without an empirical, visual, and interactive platform.
+
+### The Objective
+1. **Visual Demystification:** Transform abstract shortest-path mathematics into tangible, interactive SVG visualizations showing hop-by-hop packet progress.
+2. **Empirical Benchmarking:** Provide scientific microsecond-level latency benchmarks comparing Link-State and Distance Vector algorithmic complexity on identical topologies.
+3. **Real-World Threat & Traffic Modeling:** Go beyond textbook static paths by incorporating cyber threat defense (RPKI validation against rogue route poisoning), data center Equal-Cost Multi-Path (ECMP) balancing, and Quality-of-Service (QoS) queue priorities.
+
+---
+
+## 3. Innovative Novelty Features in Detail
+
+### Feature 1: Rogue Router Attack & RPKI Origin Validation Defense
+* **Networking Theory:** Corresponds to BGP prefix hijacking and route poisoning (RFC 6811).
+* **Attack Mechanism:** A malicious or compromised router injects fabricated zero-metric (or low-cost) advertisements to neighboring nodes. Unaware routers update their forwarding tables, redirecting packet streams directly into the compromised router.
+* **Blackhole Sinkhole:** Once the packet enters the rogue router, it is intercepted and dropped (blackhole drop), accompanied by a security trace alert in the terminal.
+* **Defense Countermeasure (RPKI):** When **RPKI Origin Validation & Quarantine** is activated, the routing engine enforces route origin authorization filters. The forged advertisement is flagged as anomalous, the compromised router is isolated/quarantined from the topology, and safe alternative paths are computed automatically.
+
+### Feature 2: Equal-Cost Multi-Path (ECMP) Flow Balancing
+* **Networking Theory:** Corresponds to RFC 2991/2992 deployed across modern hyperscale data center spine-leaf fabrics.
+* **Mechanism:** Rather than confining traffic to a single path, Dijkstra's algorithm tracks all predecessors that yield the identical minimal metric distance ($d[v] = d[u] + w$).
+* **Flow Burst Simulation:** When enabled, the simulator dispatches 4 discrete packet flows (Flow 101 to 104) across parallel paths. The frontend animates concurrent, color-differentiated packet markers across independent links, demonstrating throughput multiplication and load distribution.
+
+### Feature 3: Quality of Service (QoS) & Router Buffer Queuing
+* **Networking Theory:** Corresponds to DiffServ architecture and DSCP (Differentiated Services Code Point) traffic classification.
+* **Mechanism:**
+  * **Best-Effort (DSCP 0):** Standard bulk traffic that must wait in router buffer queues during network congestion, suffering simulated queuing delay (+12ms latency penalty).
+  * **Expedited Forwarding (DSCP 46 - VoIP / Real-Time):** High-priority traffic designated for delay-sensitive applications. Routers grant strict priority scheduling, bypassing queue buffers with 0ms queuing latency penalty.
+
+### Feature 4: Scientific Microsecond Compute Time Engine
+* **Methodology:** Standard single-run JavaScript timers suffer from browser timer resolution limits and system interrupts. To deliver mathematically rigorous metrics, the backend runs an empirical benchmarking loop of **1,000 complete algorithmic iterations** for every simulation call:
+  $$\text{Mean Compute Time} = \frac{t_{\text{elapsed}}}{1000} \quad (\mu\text{s})$$
+  This captures exact CPU execution latency down to sub-microsecond precision without artificial minimum fallbacks.
+
+### Feature 5: Forwarding Information Base (FIB) Inspector
+* Users can click any router node on the canvas (or use the dedicated action button) to open its live **Routing Table (FIB)**:
+  * Destination Router Subnet
+  * Next-Hop Forwarding Interface
+  * Accumulated Metric Cost
+  * Hop Distance
+  * Convergence Status
+
+### Feature 6: Empirical Protocol Comparison Suite
+* A side-by-side benchmark modal evaluating Dijkstra vs. Distance Vector over **2,000 iterations**:
+  * Mean execution time ($\mu$s)
+  * Time and space complexity
+  * Convergence speed under topology alterations
+  * Loop vulnerability (Count-to-Infinity)
+  * Standard protocol equivalents (OSPF vs. RIP)
 
 ---
 
 ## 4. Core Algorithms Explained
-The core of the simulator relies on two fundamental networking algorithms. 
 
 ### A. Dijkstra's Algorithm (Link-State Protocol)
-*   **Concept:** Every router is provided with a complete, global map of the entire network. Using this map, the router calculates the absolute shortest path to the destination in one go.
-*   **Real-World Analogy:** Having a bird's-eye view from a helicopter or using a complete GPS map to find the best route.
-*   **Implementation:** The backend uses a **Priority Queue (Min-Heap)**. It always explores the closest known router first, locking in the shortest distance, and then explores its neighbors. 
-*   **Pros & Cons:** Extremely fast to converge and 100% loop-free. However, sharing the entire map with every router requires massive memory and bandwidth (e.g., OSPF protocol).
+* **Concept:** Every router maintains a complete, synchronized link-state database (LSDB) of the network topology.
+* **Implementation:** Employs a Min-Heap priority queue to iteratively extract the lowest-cost unvisited node, relaxing adjacent edges until all shortest paths are resolved.
+* **ECMP Extension:** While standard Dijkstra stores a single parent node `prev[v] = u`, our implementation maintains dynamic predecessor sets `prevAll[v] = [u1, u2, ...]`, enabling recursive backtracking to extract all equal-cost paths.
+* **Time Complexity:** $O((V + E) \log V)$ using a binary min-heap.
+* **Real-World Equivalent:** Open Shortest Path First (OSPF), Intermediate System to Intermediate System (IS-IS).
 
 ### B. Distance Vector Algorithm (Bellman-Ford)
-*   **Concept:** Routers do *not* have a map of the network. They only know their immediate physical neighbors. They discover routes by constantly asking their neighbors, "How far are you from the destination?" and adding their own distance to the neighbor's answer.
-*   **Real-World Analogy:** Navigating a maze by reading signposts at each intersection, without ever seeing a map of the maze.
-*   **Implementation:** The backend "relaxes" all active edges mathematically $|V| - 1$ times (where V is the number of routers). 
-*   **Pros & Cons:** Requires very little memory and bandwidth (e.g., RIP protocol). However, it adapts very slowly to broken links (slow convergence).
+* **Concept:** Routers exchange distance estimates exclusively with their immediate physical neighbors.
+* **Implementation:** The algorithm relaxes active edges iteratively $|V| - 1$ times.
+* **Loop Prevention:** Incorporates Split Horizon and Poison Reverse logic, suppressing reverse route advertisements along links from which updates were learned.
+* **Time Complexity:** $O(V \cdot E)$.
+* **Real-World Equivalent:** Routing Information Protocol (RIPv1, RIPv2).
 
 ---
 
-## 5. Object-Oriented Programming (OOP) Concepts Used
-The software architecture heavily relies on the four pillars of Object-Oriented Programming to maintain clean, modular, and scalable code.
+## 5. Object-Oriented Programming (OOP) Concepts
 
-### 1. Classes and Objects
-*   **Definition:** A Class is a blueprint that defines properties and behaviors. An Object is an actual instance created from that blueprint.
-*   **Project Example:** In the frontend (`graph-ui.js`), there is a `class GraphUI`. It defines the blueprint for how a network grid should behave. When the app starts, we create an Object: `const ui = new GraphUI("visualization");`. Similarly, every Router on the screen is treated as a unique object containing its own specific `id`, `x`, and `y` coordinates.
-
-### 2. Encapsulation
-*   **Definition:** The bundling of data (variables) and methods (functions) into a single unit, hiding the internal state from outside interference.
-*   **Project Example:** Inside the `GraphUI` class, the arrays holding the raw SVG elements (`this.nodes` and `this.edges`) are encapsulated. The main application (`app.js`) cannot randomly change an SVG circle's radius directly. Instead, `app.js` must call controlled public methods like `ui.drawGraph()` or `ui.animatePacket()`. This protects the visual state from being corrupted by rogue data.
-
-### 3. Inheritance
-*   **Definition:** A mechanism where a new class inherits properties and behaviors from an existing parent class, promoting code reusability.
-*   **Project Example:** In the backend C++ architecture (`algorithms/`), there is a parent class called `RoutingAlgorithm`. It holds common logic like `startTimer()`, `stopTimer()`, and `logTrace()`. The specific algorithms (`class Dijkstra` and `class DistanceVector`) **inherit** from `RoutingAlgorithm`. The developer did not have to rewrite the timer logic in both files, saving time and preventing bugs.
-
-### 4. Polymorphism
-*   **Definition:** The ability of different objects to respond to the exact same method call in their own unique way.
-*   **Project Example:** Both the `Dijkstra` and `DistanceVector` modules have a function named `calculateShortestPath(source, target)`. When the API receives a request, the server simply calls `algorithm.calculateShortestPath()`. The server doesn't need to write completely different if/else blocks to handle the math—thanks to polymorphism, the selected algorithm object intrinsically knows how to execute its specific version of that method.
+1. **Classes and Objects:**
+   * Frontend: `class GraphUI` encapsulates SVG rendering, coordinate mapping, and multi-flow animation physics. Instances manage individual network components and states.
+   * Backend: Router and Link data models maintain independent state vectors (active flags, latency weights, coordinates).
+2. **Encapsulation:**
+   * State variables (SVG node dictionaries, coordinate arrays, animation frames) are isolated within `GraphUI`. Application logic accesses them via structured interface methods (`drawGraph`, `animateSimulation`, `clearActiveRoutes`).
+3. **Inheritance & Modular Design:**
+   * Algorithmic handlers inherit common benchmark timing, trace formatting, and metric calculation primitives.
+4. **Polymorphism:**
+   * Unified interface contracts: the simulation endpoint executes `calculateRoute(src, dst)` dynamically whether Link-State or Distance Vector is specified.
 
 ---
 
 ## 6. System Architecture & Tech Stack
-*   **Frontend UI:** HTML5, CSS3, and Vanilla JavaScript.
-*   **Graphics Rendering:** SVG (Scalable Vector Graphics) manipulated via the DOM for crisp, lightweight, and hardware-accelerated animations.
-*   **Backend Server:** Node.js (`http` module).
-*   **Data Exchange:** The frontend packages the nodes, edges, algorithm choice, and custom options into a **JSON payload**. It sends this via a POST request to `/api/simulate`. The backend computes the shortest path mathematically and returns a JSON response containing the `totalCost`, `hops`, `computeTimeMs`, and an array of steps (`trace`) for the frontend to animate.
+
+* **Frontend UI:** HTML5, CSS3, Vanilla JavaScript.
+* **Vector Graphics Rendering:** Hardware-accelerated SVG DOM manipulation.
+* **Backend Engine:** Node.js HTTP server (`server.js`) with high-resolution performance counters (`perf_hooks`).
+* **Data Protocol:** Standard RESTful JSON exchange over HTTP:
+  * `POST /api/simulate`: Executes routing algorithms, ECMP extraction, security filtering, and trace generation.
+  * `POST /api/compare`: Runs multi-thousand-iteration empirical benchmark comparisons.
+  * `POST /api/routing-table`: Builds router-specific Forwarding Information Bases.
+  * `GET /api/health`: Provides continuous liveness monitoring.
 
 ---
 
-## 7. How to Setup and Run
-1. Ensure **Node.js** is installed on your computer.
-2. Open the `PACKETSIMULATOR` folder in VS Code or any terminal.
-3. Run the command: `node server.js`
-4. Open a web browser and navigate to `http://localhost:8080`.
-5. **To use:** Add nodes and edges using the left panel, select your source and destination, choose an algorithm, and click **Run Simulation** to watch the packet travel.
+## 7. Setup and Execution Guide
+
+1. Ensure **Node.js** (v18+) is installed.
+2. In the project directory, run:
+   ```bash
+   node server.js
+   ```
+3. Open a browser and navigate to:
+   ```
+   http://localhost:8080
+   ```
+4. **Usage Instructions:**
+   * **Standard Simulation:** Select Source and Destination routers, pick an algorithm, and click **Run Simulation**.
+   * **ECMP Multi-Path:** Click **Load Multi-Path Grid (ECMP)**, ensure Traffic Mode is set to *Traffic Flow Burst*, and click **Run Simulation**.
+   * **Security Testing:** Check *Simulate Rogue Router*, run simulation to observe blackhole drop, then check *RPKI Origin Validation & Quarantine* to observe automated containment and rerouting.
+   * **FIB Inspection:** Click any router node in idle mode or click **Inspect Routing Table (FIB)**.
