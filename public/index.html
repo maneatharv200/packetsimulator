@@ -60,6 +60,34 @@
                 </label>
             </div>
 
+            <!-- Demo RPKI Scenario Reference Info -->
+            <div class="security-meta-box" id="securityMetaBox" style="display: none;">
+                <div class="sec-meta-title">RPKI Scenario Ground Truth</div>
+                <div class="meta-row">
+                    <span class="meta-label">Target Prefix:</span>
+                    <span class="meta-val font-mono">10.0.0.0/24</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">ROA Authorized Origin:</span>
+                    <span class="meta-val font-mono badge-valid-inline">AS 100</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Rogue Injected Origin:</span>
+                    <span class="meta-val font-mono badge-invalid-inline">AS 999</span>
+                </div>
+            </div>
+
+            <!-- Backend Confirmed RPKI Validation Result Card -->
+            <div class="rpki-status-card" id="rpkiStatusCard" style="display: none;">
+                <div class="rpki-header">
+                    <span class="rpki-title">RPKI Origin Validation</span>
+                    <span id="rpkiStatusBadge" class="rpki-badge badge-valid">VALID</span>
+                </div>
+                <div id="rpkiDetailsText" class="rpki-details-text">
+                    <!-- Populated dynamically from API response -->
+                </div>
+            </div>
+
             <div class="section-divider"></div>
 
             <div class="instructions">

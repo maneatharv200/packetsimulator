@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method !== 'POST') {
-        return sendJson(res, 405, { error: "Method not allowed" });
+        return sendJson(res, 405, { success: false, error: "Method not allowed. Use POST." });
     }
 
     try {
@@ -73,20 +73,49 @@ module.exports = async (req, res) => {
         const nodes = data.nodes || [];
         const edges = data.edges || [];
 
-        // Run algorithms 1,000 times to get measurable latency
-        let dStart = performance.now();
-        for (let i = 0; i < 1000; i++) runDijkstra(src, target, nodes, edges);
-        let dTime = (performance.now() - dStart).toFixed(2);
+        if (!src || !target) {
+            return sendJson(res, 400, { success: false, error: "Source and target router IDs are required." });
+        }
 
-        let dvStart = performance.now();
-        for (let i = 0; i < 1000; i++) runDistanceVector(src, target, nodes, edges);
-        let dvTime = (performance.now() - dvStart).toFixed(2);
+        const ITERATIONS = 2000;
+
+        // Benchmark Dijkstra (Link-State)
+        const dStart = performance.now();
+        for (let i = 0; i < ITERATIONS; i++) {
+            runDijkstra(src, target, nodes, edges);
+        }
+        const dTotal = performance.now() - dStart;
+        const dAvgUs = (dTotal * 1000) / ITERATIONS;
+
+        // Benchmark Distance Vector (Bellman-Ford)
+        const dvStart = performance.now();
+        for (let i = 0; i < ITERATIONS; i++) {
+            runDistanceVector(src, target, nodes, edges);
+        }
+        const dvTotal = performance.now() - dvStart;
+        const dvAvgUs = (dvTotal * 1000) / ITERATIONS;
 
         return sendJson(res, 200, {
             success: true,
-            message: `Benchmark (1,000 iterations):\nDijkstra: ${dTime} ms\nDistance Vector: ${dvTime} ms`
+            iterations: ITERATIONS,
+            dijkstra: {
+                protocol: "Link-State (OSPF / IS-IS)",
+                avgTimeUs: parseFloat(dAvgUs.toFixed(2)),
+                avgTimeMs: parseFloat((dTotal / ITERATIONS).toFixed(4)),
+                complexity: "O((V + E) log V)",
+                convergence: "Instant (Global Map)",
+                loopFree: "Guaranteed (SPF Tree)"
+            },
+            distanceVector: {
+                protocol: "Distance Vector (RIPv1 / RIPv2)",
+                avgTimeUs: parseFloat(dvAvgUs.toFixed(2)),
+                avgTimeMs: parseFloat((dvTotal / ITERATIONS).toFixed(4)),
+                complexity: "O(V * E)",
+                convergence: "Slow (Iterative Neighbor Exchange)",
+                loopFree: "Requires Split Horizon / Poison Reverse"
+            }
         });
     } catch (e) {
-        return sendJson(res, 500, { error: e.message });
+        return sendJson(res, 500, { success: false, error: e.message });
     }
 };

@@ -147,21 +147,34 @@ document.getElementById("simSpeed").addEventListener("change", (e) => {
 // Security Controls toggle
 const chkSimulateRogue = document.getElementById("chkSimulateRogue");
 const rogueSelectContainer = document.getElementById("rogueSelectContainer");
+const securityMetaBox = document.getElementById("securityMetaBox");
+const rpkiStatusCard = document.getElementById("rpkiStatusCard");
 
 chkSimulateRogue.addEventListener("change", () => {
     if (chkSimulateRogue.checked) {
         rogueSelectContainer.style.display = "flex";
-        document.getElementById("resSecurity").textContent = "Rogue Node Armed";
-        showToast("Rogue router simulation enabled", "info");
+        if (securityMetaBox) securityMetaBox.style.display = "block";
+        document.getElementById("resSecurity").textContent = "Armed (Run to verify)";
+        showToast("Rogue router simulation armed", "info");
     } else {
         rogueSelectContainer.style.display = "none";
+        if (securityMetaBox) securityMetaBox.style.display = "none";
+        if (rpkiStatusCard) rpkiStatusCard.style.display = "none";
         document.getElementById("resSecurity").textContent = "Verified Normal";
+        document.getElementById("resSecurity").style.color = "var(--text-main)";
     }
     refreshCanvas();
 });
 
-document.getElementById("rogueNodeSelect").addEventListener("change", () => refreshCanvas());
-document.getElementById("chkRpkiDefense").addEventListener("change", () => refreshCanvas());
+document.getElementById("rogueNodeSelect").addEventListener("change", () => {
+    document.getElementById("resSecurity").textContent = "Armed (Run to verify)";
+    refreshCanvas();
+});
+
+document.getElementById("chkRpkiDefense").addEventListener("change", () => {
+    document.getElementById("resSecurity").textContent = "Armed (Run to verify)";
+    refreshCanvas();
+});
 
 // Mode state: idle, add_node, add_edge
 let appMode = 'idle';
@@ -281,7 +294,10 @@ async function runSimulation() {
             rogueNodeId: rogueId,
             rpkiEnabled: isRpkiActive,
             trafficMode: trafficMode,
-            qosClass: qosClass
+            qosClass: qosClass,
+            destinationPrefix: "10.0.0.0/24",
+            targetAsn: 100,
+            rogueAsn: 999
         }
     };
 
@@ -304,27 +320,94 @@ async function runSimulation() {
             document.getElementById("resTime").textContent = "-";
         }
 
-        // Update Security Status Display
-        if (isRogueActive) {
-            if (isRpkiActive) {
-                document.getElementById("resSecurity").textContent = "RPKI Quarantined & Rerouted";
-            } else {
-                document.getElementById("resSecurity").textContent = "Rogue Blackhole Intercept";
-            }
+        // Update Security Status Display based strictly on verified backend response
+        const secLabel = document.getElementById("resSecurity");
+        if (res.securityStatus === 'RPKI_INVALID_REJECTED') {
+            secLabel.textContent = "RPKI Enforced: Invalid Route Rejected";
+            secLabel.style.color = "var(--source-color)";
+        } else if (res.securityStatus === 'ROGUE_ATTACK_ACTIVE') {
+            secLabel.textContent = "Rogue Attack Active (Blackhole Intercept)";
+            secLabel.style.color = "var(--failed-link)";
+        } else if (res.securityStatus === 'RPKI_BLOCKED_UNREACHABLE') {
+            secLabel.textContent = "RPKI Quarantined: Destination Blocked";
+            secLabel.style.color = "var(--dest-color)";
         } else {
-            document.getElementById("resSecurity").textContent = "Verified Normal";
+            secLabel.textContent = "Verified Normal";
+            secLabel.style.color = "var(--text-main)";
         }
 
-        // Refresh canvas with quarantined node state if applicable
-        if (res.quarantinedNodes && res.quarantinedNodes.length > 0) {
-            refreshCanvas({ quarantinedNodes: res.quarantinedNodes });
+        // Update RPKI Status Card from verified rpkiResults
+        const rpkiCard = document.getElementById("rpkiStatusCard");
+        const rpkiBadge = document.getElementById("rpkiStatusBadge");
+        const rpkiDetails = document.getElementById("rpkiDetailsText");
+
+        if (res.rpkiResults && res.rpkiResults.length > 0 && isRogueActive) {
+            if (rpkiCard) rpkiCard.style.display = "block";
+            const rogueRes = res.rpkiResults.find(r => r.isRogue) || res.rpkiResults[0];
+            const primaryStatus = rogueRes.status || 'VALID';
+
+            if (rpkiBadge) {
+                rpkiBadge.textContent = primaryStatus;
+                rpkiBadge.className = `rpki-badge badge-${primaryStatus.toLowerCase()}`;
+            }
+
+            if (rpkiDetails) {
+                let detailsHtml = `
+                    <div class="rpki-detail-item"><strong>Target Prefix:</strong> ${rogueRes.prefix}</div>
+                    <div class="rpki-detail-item"><strong>Advertised Origin:</strong> AS ${rogueRes.originAsn} (${rogueRes.advertisingRouter})</div>
+                `;
+
+                if (res.quarantinedRoutes && res.quarantinedRoutes.length > 0) {
+                    detailsHtml += `
+                        <div class="rpki-detail-item"><strong>Validation:</strong> <span style="color: var(--failed-link); font-weight: 700;">INVALID (Unauthorized Origin)</span></div>
+                        <div class="rpki-detail-item"><strong>Defense Policy:</strong> Route Quarantined & Filtered from FIB</div>
+                        <div class="rpki-detail-item"><strong>Reason:</strong> ${rogueRes.reason}</div>
+                    `;
+                } else if (primaryStatus === 'INVALID' && !isRpkiActive) {
+                    detailsHtml += `
+                        <div class="rpki-detail-item"><strong>Validation:</strong> <span style="color: var(--failed-link); font-weight: 700;">INVALID (Defense Disabled)</span></div>
+                        <div class="rpki-detail-item"><strong>Warning:</strong> RPKI Defense OFF; poisoned advertisement accepted!</div>
+                    `;
+                } else if (primaryStatus === 'VALID') {
+                    detailsHtml += `
+                        <div class="rpki-detail-item"><strong>Validation:</strong> <span style="color: var(--source-color); font-weight: 700;">VALID (ROA Authorized)</span></div>
+                        <div class="rpki-detail-item"><strong>Policy:</strong> Permitted in routing table</div>
+                    `;
+                } else {
+                    detailsHtml += `
+                        <div class="rpki-detail-item"><strong>Validation:</strong> <span style="color: #B45309; font-weight: 700;">NOT_FOUND</span></div>
+                        <div class="rpki-detail-item"><strong>Policy:</strong> Permitted under standard policy</div>
+                    `;
+                }
+
+                if (res.delivered && res.path && res.path.length > 0) {
+                    detailsHtml += `
+                        <div class="rpki-detail-item"><strong>Selected Safe Route:</strong> [${res.path.join(" -> ")}]</div>
+                    `;
+                }
+
+                rpkiDetails.innerHTML = detailsHtml;
+            }
+        } else if (rpkiCard) {
+            rpkiCard.style.display = "none";
         }
+
+        // Refresh canvas with quarantined node state confirmed by backend
+        refreshCanvas({ quarantinedNodes: res.quarantinedNodes || [] });
 
         if (!res.success || !res.delivered) {
-            document.getElementById("resStatus").textContent = isRogueActive && !isRpkiActive ? "Dropped (Rogue)" : "Unreachable";
+            if (res.securityStatus === 'ROGUE_ATTACK_ACTIVE') {
+                document.getElementById("resStatus").textContent = "Dropped (Rogue Intercept)";
+                showToast("Packet intercepted by rogue router blackhole", "error");
+            } else if (res.securityStatus === 'RPKI_BLOCKED_UNREACHABLE') {
+                document.getElementById("resStatus").textContent = "Blocked (No Safe Route)";
+                showToast("RPKI filtered rogue route; no alternate path to destination", "error");
+            } else {
+                document.getElementById("resStatus").textContent = "Unreachable";
+                showToast("No path found between selected routers", "error");
+            }
             document.getElementById("resCost").textContent = "-";
             document.getElementById("resHops").textContent = "-";
-            showToast(isRogueActive && !isRpkiActive ? "Packet intercepted by rogue router" : "No path found between selected routers", "error");
             if (res.trace) {
                 await ui.animateSimulation(res, { trafficMode });
             }
@@ -332,7 +415,10 @@ async function runSimulation() {
         }
 
         // Delivery Succeeded
-        if (trafficMode === 'flow_burst' && res.ecmpPaths && res.ecmpPaths.length > 1) {
+        if (res.securityStatus === 'RPKI_INVALID_REJECTED') {
+            document.getElementById("resStatus").textContent = "Delivered (Safe Reroute)";
+            showToast("RPKI rejected rogue route. Delivered via verified safe path!", "success");
+        } else if (trafficMode === 'flow_burst' && res.ecmpPaths && res.ecmpPaths.length > 1) {
             document.getElementById("resStatus").textContent = `Delivered (ECMP ${res.ecmpPaths.length} Paths)`;
         } else {
             document.getElementById("resStatus").textContent = "Delivered (Optimal)";
@@ -344,8 +430,9 @@ async function runSimulation() {
         await ui.animateSimulation(res, { trafficMode });
 
     } catch (e) {
-        showToast("Backend connection error", "error");
+        showToast(e.message || "Backend connection error", "error");
         document.getElementById("resStatus").textContent = "Error";
+        document.getElementById("resSecurity").textContent = "Simulation Failed";
     }
 }
 
