@@ -18,8 +18,12 @@ const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (!res.ok) throw new Error("Simulation backend error");
-            return await res.json();
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const errMessage = (data && data.error) ? data.error : `Simulation backend error (${res.status})`;
+                throw new Error(errMessage);
+            }
+            return data;
         } catch (e) {
             console.error("Simulation request failed:", e);
             throw e;
@@ -33,8 +37,12 @@ const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            if (!res.ok) throw new Error("Comparison backend error");
-            return await res.json();
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const errMessage = (data && data.error) ? data.error : `Comparison backend error (${res.status})`;
+                throw new Error(errMessage);
+            }
+            return data;
         } catch (e) {
             console.error("Comparison request failed:", e);
             throw e;
@@ -48,8 +56,12 @@ const API = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ routerId, nodes, edges })
             });
-            if (!res.ok) throw new Error("Routing table backend error");
-            return await res.json();
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                const errMessage = (data && data.error) ? data.error : `Routing table backend error (${res.status})`;
+                throw new Error(errMessage);
+            }
+            return data;
         } catch (e) {
             console.error("Routing table query failed:", e);
             throw e;

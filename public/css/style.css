@@ -666,3 +666,120 @@ button.danger:hover {
 
 @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(10px); } }
+
+/* RPKI Origin Validation & Security Metadata */
+.security-meta-box {
+    margin-top: 10px;
+    background: #F8FAFC;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 11px;
+}
+
+.sec-meta-title {
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.meta-label {
+    color: var(--text-muted);
+}
+
+.meta-val {
+    font-weight: 600;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.badge-valid-inline {
+    background: #DCFCE7;
+    color: #15803D;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.badge-invalid-inline {
+    background: #FEE2E2;
+    color: #B91C1C;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.rpki-status-card {
+    margin-top: 12px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rpki-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.rpki-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.rpki-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.badge-valid {
+    background: #DCFCE7;
+    color: #15803D;
+    border: 1px solid #86EFAC;
+}
+
+.badge-invalid {
+    background: #FEE2E2;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+}
+
+.badge-notfound {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+.rpki-details-text {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+
+.rpki-detail-item {
+    margin-top: 4px;
+}
+
+.rpki-detail-item strong {
+    color: var(--text-main);
+}
